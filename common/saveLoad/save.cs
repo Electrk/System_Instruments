@@ -11,7 +11,7 @@
 // etc.
 
 
-function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, %overwrite, %authorToWrite) {
+function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, %overwrite, %authorToWrite, %isUploading) {
   if (%type !$= "phrase" && %type !$= "song" && %type !$= "bindset") { 
     return; 
   }
@@ -40,7 +40,12 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
     %binds = InstrumentsClient.binds;
   }
   else {
-    %binds = %client.instrumentBinds;
+    if (%isUploading) {
+      %binds = %client.instrumentUploadBinds;
+    }
+    else {
+      %binds = %client.instrumentBinds;
+    }
   }
 
   if (%type $= "bindset" && %binds.bindCount < 3) {
@@ -56,6 +61,10 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
   }
   else {
     %localOrServer = "local";
+  }
+
+  if (%isUploading $= "") {
+    %isUploading = false;
   }
 
   %path = Instruments.getFilePath(%type, %filename, %localOrServer);
@@ -131,6 +140,8 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
     %localOrServer = "local";
   }
 
+  Instruments.onFileSaveStart(%type, %filename, %phraseOrSong, %client, %isUploading);
+
   %file = new FileObject();
   %file.openForWrite(%path);
   %file.writeLine($Instruments::Version TAB $Instruments::NotationVersion);
@@ -142,11 +153,23 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
 
   if (%type $= "song") {
     for (%i = 0; %i < 20; %i++) {
+
       if (%client $= "") {
-        %phrase = getField(InstrumentsDlg_SongPhraseList.getRowText(%i), 1);
+        if ($Instruments::GUI::isDownloading) {
+          %phrase = $Instruments::GUI::Download::SongPhrase[%i];
+        }
+        else {
+          %phrase = getField(InstrumentsDlg_SongPhraseList.getRowText(%i), 1);
+        }
       }
       else {
-        %phrase = %client.songPhrase[%i];
+        if (%isUploading) {
+          %phrase = %client.uploadSongPhrase[%i];
+          %client.uploadSongPhrase[%i] = "";
+        }
+        else {
+          %phrase = %client.songPhrase[%i];
+        }
       }
 
       if (_strEmpty(%phrase)) { 
@@ -157,7 +180,12 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
     }
   }
   else if (%type $= "bindset") {
-    %bindCount = %binds.currIndex;
+    if ($Instruments::GUI::isDownloading) {
+      %bindCount = $Instruments::GUI::Download::NumBinds;
+    }
+    else {
+      %bindCount = %binds.currIndex;
+    }
 
     for (%i = 0; %i < %bindCount; %i++) {
       
@@ -166,7 +194,12 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
         break;
       }
 
-      %bind = %binds._bind[%i];
+      if ($Instruments::GUI::isDownloading) {
+        %bind = $Instruments::GUI::Download::Bind[%i];
+      }
+      else {
+        %bind = %binds._bind[%i];
+      }
 
       if (_strEmpty(%bind)) {
         continue;
@@ -179,24 +212,61 @@ function Instruments::saveFile(%this, %type, %filename, %phraseOrSong, %client, 
   %file.close();
   %file.delete();
 
-
-  if (!%overwritingFile) {
-    if (%client $= "") {
-      InstrumentsClient.refreshFileLists();
-    }
-    else if (isFile(%path)) {
-      commandToAll('Instruments_onFileAdded', %filename, %type, %client.name TAB %client.getBLID());
-    }
-  }
-
-  if (isFile(%path)) {
-    Instruments.messageBoxOK("File Saved", "File saved successfully.", %client);
-  }
-  else {
-    Instruments.messageBoxOK("Write Error", "Could not save file!", %client);
-  }
-
   if (%client !$= "") {
     %client.lastInstrumentsSaveTime = getSimTime();
   }
+
+  if (!isFile(%path)) {
+    %failure = "Could not save file!";
+  }
+
+  Instruments.onFileSaved(%type, %filename, %client, %overwritingFile, %authorToWrite, %failure, %isUploading);
+}
+
+function Instruments::onFileSaved(%this, %type, %filename, %client, %overwriting, %author, %failure, %isUploading) {
+  if (%client $= "") {
+    %namespace = "InstrumentsClient";
+  }
+  else {
+    %namespace = "InstrumentsServer";
+  }
+
+  %authorName = getField(%author, 0);
+  %authorBL_ID = getField(%author, 1);
+
+  if (%failure $= "") {
+
+    if (!%overwriting) {
+      if (%client $= "") {
+        InstrumentsClient.refreshFileLists();
+      }
+      else if (isFile(%path)) {
+        commandToAll('Instruments_onFileAdded', %filename, %type, %author);
+      }
+    }
+
+    if (%type $= "phrase") {
+      %namespace.onPhraseSaved(%filename, %authorName, %authorBL_ID, %client, %isUploading);
+    }
+    else if (%type $= "song") {
+      %namespace.onSongSaved(%filename, %authorName, %authorBL_ID, %client, %isUploading);
+    }
+    else if (%type $= "bindset") {
+      %namespace.onBindsetSaved(%filename, %authorName, %authorBL_ID, %client, %isUploading);
+    }
+  }
+  else {
+    %namespace.onFileSaveError(%type, %filename, %client, %failure, %isUploading);
+  }
+}
+
+function Instruments::onFileSaveStart(%this, %type, %filename, %phraseOrSong, %client, %isUploading) {
+  if (%client $= "") {
+    %namespace = "InstrumentsClient";
+  }
+  else {
+    %namespace = "InstrumentsServer";
+  }
+
+  %namespace.onFileSaveStart(%type, %filename, %phraseOrSong, %client, %isUploading);
 }

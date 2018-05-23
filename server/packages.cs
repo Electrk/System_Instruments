@@ -24,6 +24,10 @@ package System_Instruments__server {
       %client.instrumentBinds.delete();
     }
 
+    if (isObject(%client.instrumentUploadBinds)) {
+      %client.instrumentUploadBinds.delete();
+    }
+
     Parent::onDrop(%client, %reason);
   }
 

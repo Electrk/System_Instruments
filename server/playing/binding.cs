@@ -1,4 +1,4 @@
-function serverCmdInstruments_BindToKey(%client, %key, %phraseOrNote) {
+function serverCmdInstruments_BindToKey(%client, %key, %phraseOrNote, %isUploading) {
   if (!%client.hasInstrumentsClient) {
     return;
   }
@@ -24,11 +24,25 @@ function serverCmdInstruments_BindToKey(%client, %key, %phraseOrNote) {
     };
   }
 
-  if (_strEmpty(%phraseOrNote)) {
-    %client.instrumentBinds.removeBind(%key);
+  if (!isObject(%client.instrumentUploadBinds)) {
+    %client.instrumentUploadBinds = new ScriptObject() {
+      class = "InstrumentsBindset";
+      client = %client;
+    };
+  }
+
+  if (%isUploading) {
+    %binds = %client.instrumentUploadBinds;
   }
   else {
-    %client.instrumentBinds.addBind(%key, %phraseOrNote);
+    %binds = %client.instrumentBinds;
+  }
+
+  if (_strEmpty(%phraseOrNote)) {
+    %binds.removeBind(%key);
+  }
+  else {
+    %binds.addBind(%key, %phraseOrNote);
   }
 }
 

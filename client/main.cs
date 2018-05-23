@@ -46,6 +46,7 @@ exec("./panels/files/fileList.cs");
 exec("./panels/files/save.cs");
 exec("./panels/files/load.cs");
 exec("./panels/files/delete.cs");
+exec("./panels/files/uploadDownload.cs");
 
 // For the "Help" section of the GUI
 exec("./panels/help/helpCategories.cs");

@@ -35,14 +35,19 @@ function serverCmdInstruments_GetVersion(%client, %version, %notationVersion) {
     %client.canUseInstruments = false;
   }
 
-  if (isObject(%client.instrumentBinds)) {
-    %client.instrumentBinds.delete();
+  if (!isObject(%client.instrumentBinds)) {
+    %client.instrumentBinds = new ScriptObject() {
+      class = "InstrumentsBindset";
+      client = %client;
+    };
   }
 
-  %client.instrumentBinds = new ScriptObject() {
-    class = "InstrumentsBindset";
-    client = %client;
-  };
+  if (!isObject(%client.instrumentUploadBinds)) {
+    %client.instrumentUploadBinds = new ScriptObject() {
+      class = "InstrumentsBindset";
+      client = %client;
+    };
+  }
 }
 
 function serverCmdInstruments_CanIUse(%client, %type, %showMessage) {

@@ -1,4 +1,4 @@
-function serverCmdSetSongPhrase(%client, %index, %phrase, %usingGui) {
+function serverCmdSetSongPhrase(%client, %index, %phrase, %usingGui, %isUploading) {
   if (!%client.hasInstrumentsClient) {
     return;
   }
@@ -6,6 +6,8 @@ function serverCmdSetSongPhrase(%client, %index, %phrase, %usingGui) {
   if (!InstrumentsServer.checkSongPermissions(%client, 1)) { 
     return; 
   }
+
+  %index = mRound(%index);
 
   if (!_isInt(%index)) {
     if (%usingGui) {
@@ -56,7 +58,12 @@ function serverCmdSetSongPhrase(%client, %index, %phrase, %usingGui) {
     return;
   } 
 
-  %client.songPhrase[%index] = %phrase;
+  if (%isUploading) {
+    %client.uploadSongPhrase[%index] = %phrase;
+  }
+  else {
+    %client.songPhrase[%index] = %phrase;
+  }
 
   if (!%usingGui) {
     messageClient(%client, '', "\c6Song phrase \c3" @ %index SPC "\c6set to \c3" @ %phrase);

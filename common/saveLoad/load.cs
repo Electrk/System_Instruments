@@ -1,4 +1,4 @@
-function Instruments::loadFile(%this, %type, %filename, %client) {
+function Instruments::loadFile(%this, %type, %filename, %client, %isDownloading) {
   %filename = stripTrailingSpaces(%filename);
 
   if (_strEmpty(%filename)) {
@@ -19,6 +19,10 @@ function Instruments::loadFile(%this, %type, %filename, %client) {
   }
   else {
     %localOrServer = "local";
+  }
+
+  if (%isDownloading $= "") {
+    %isDownloading = false;
   }
 
   %path = Instruments.getFilePath(%type, %filename, %localOrServer);
@@ -94,7 +98,7 @@ function Instruments::loadFile(%this, %type, %filename, %client) {
           %song = %line;
         }
         else if (%lineCount > 2) {
-          Instruments.onFileData(%type, %songPhraseCount TAB %line, %client);
+          Instruments.onFileData(%type, %songPhraseCount TAB %line, %client, %isDownloading);
           %songPhraseCount++;
         }
       }
@@ -102,7 +106,7 @@ function Instruments::loadFile(%this, %type, %filename, %client) {
         %key = getField(%line, 0);
         %phrase = getField(%line, 1);
 
-        Instruments.onFileData(%type, %key TAB %phrase, %client);
+        Instruments.onFileData(%type, %key TAB %phrase, %client, %isDownloading);
         %bindCount++;
       }
     }
@@ -114,15 +118,15 @@ function Instruments::loadFile(%this, %type, %filename, %client) {
   %file.delete();
 
   if (%type $= "phrase") {
-    Instruments.onFileLoaded(%type, %phrase, %filename, %author, %id, %client, %failure);
+    Instruments.onFileLoaded(%type, %phrase, %filename, %author, %id, %client, %failure, %isDownloading);
   }
 
   if (%type $= "song") {
-    Instruments.onFileLoaded(%type, %song, %filename, %author, %id, %client, %failure);
+    Instruments.onFileLoaded(%type, %song, %filename, %author, %id, %client, %failure, %isDownloading);
   }
 
   if (%type $= "bindset") {
-    Instruments.onFileLoaded(%type, "", %filename, %author, %id, %client, %failure);
+    Instruments.onFileLoaded(%type, "", %filename, %author, %id, %client, %failure, %isDownloading);
   }
 
   if (%client !$= "") {
@@ -130,7 +134,7 @@ function Instruments::loadFile(%this, %type, %filename, %client) {
   }
 }
 
-function Instruments::onFileLoaded(%this, %type, %data, %filename, %author, %bl_id, %client, %failure) {
+function Instruments::onFileLoaded(%this, %type, %data, %filename, %author, %bl_id, %client, %failure, %isDownloading) {
   if (%client $= "") {
     %namespace = "InstrumentsClient";
   }
@@ -139,13 +143,13 @@ function Instruments::onFileLoaded(%this, %type, %data, %filename, %author, %bl_
   }
 
   if (%type $= "phrase") {
-    %namespace.onPhraseLoaded(%data, %filename, %author, %bl_id, %client, %failure);
+    %namespace.onPhraseLoaded(%data, %filename, %author, %bl_id, %client, %failure, %isDownloading);
   }
   else if (%type $= "song") {
-    %namespace.onSongLoaded(%data, %filename, %author, %bl_id, %client, %failure);
+    %namespace.onSongLoaded(%data, %filename, %author, %bl_id, %client, %failure, %isDownloading);
   }
   else if (%type $= "bindset") {
-    %namespace.onBindsetLoaded(%filename, %author, %bl_id, %client, %failure);
+    %namespace.onBindsetLoaded(%filename, %author, %bl_id, %client, %failure, %isDownloading);
   }
 }
 
@@ -158,7 +162,7 @@ function Instruments::onFileData(%this, %type, %data, %client) {
       InstrumentsClient.onSongPhraseData(%field1, %field2, 1);
     }
     else {
-      InstrumentsServer.onSongPhraseData(%field1, %field2, %client);
+      InstrumentsServer.onSongPhraseData(%field1, %field2, %client, %isDownloading);
     }
   }
   else if (%type $= "bindset") {
@@ -166,7 +170,7 @@ function Instruments::onFileData(%this, %type, %data, %client) {
       InstrumentsClient.onBindsetData(%field1, %field2, 1);
     }
     else {
-      InstrumentsServer.onBindsetData(%field1, %field2, %client);
+      InstrumentsServer.onBindsetData(%field1, %field2, %client, %isDownloading);
     }
   }
 }

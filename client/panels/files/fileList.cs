@@ -1,3 +1,5 @@
+// More gross disabling/enabling stuff -- sorry!
+
 function clientCmdInstruments_receiveFileListStart() {
   InstrumentsFileManager.clearFiles();
   InstrumentsClient.setFileListMode("root");
@@ -192,10 +194,13 @@ function InstrumentsClient::clickFileList(%this, %localOrServer) {
     InstrumentsDlg_LoadServerFile.disable();
     InstrumentsDlg_RenameServerFile.disable();
     InstrumentsDlg_DeleteServerFile.disable();
+    InstrumentsDlg_DownloadFile.disable();
 
     InstrumentsDlg_LoadLocalFile.enable();
     InstrumentsDlg_RenameLocalFile.enable();
     InstrumentsDlg_DeleteLocalFile.enable();
+
+    InstrumentsDlg_UploadFile.doDisableCheck(!$Instruments::Client::CanUseSaving);
   }
   else {
     InstrumentsDlg_LocalFileList.setSelectedRow(-1);
@@ -203,6 +208,7 @@ function InstrumentsClient::clickFileList(%this, %localOrServer) {
     InstrumentsDlg_LoadLocalFile.disable();
     InstrumentsDlg_RenameLocalFile.disable();
     InstrumentsDlg_DeleteLocalFile.disable();
+    InstrumentsDlg_UploadFile.disable();
 
     %mode = $Instruments::GUI::FileListMode;
 
@@ -229,6 +235,7 @@ function InstrumentsClient::clickFileList(%this, %localOrServer) {
       }
 
       InstrumentsDlg_LoadServerFile.doDisableCheck(!$Instruments::Client::CanUseLoading);
+      InstrumentsDlg_DownloadFile.doDisableCheck(!$Instruments::Client::CanUseLoading);
     }
   }
 
@@ -267,6 +274,9 @@ function InstrumentsClient::setFileListMode(%this, %mode) {
     InstrumentsDlg_DeleteLocalFile.disable();
     InstrumentsDlg_RenameLocalFile.disable();
 
+    InstrumentsDlg_DownloadFile.disable();
+    InstrumentsDlg_UploadFile.disable();
+
     InstrumentsDlg_RefreshServerFiles.visible = false;
     InstrumentsDlg_RefreshLocalFiles.visible = false;
   }
@@ -281,6 +291,9 @@ function InstrumentsClient::setFileListMode(%this, %mode) {
     InstrumentsDlg_LoadLocalFile.disable();
     InstrumentsDlg_DeleteLocalFile.disable();
     InstrumentsDlg_RenameLocalFile.disable();
+
+    InstrumentsDlg_DownloadFile.disable();
+    InstrumentsDlg_UploadFile.disable();
 
     InstrumentsDlg_RefreshServerFiles.visible = true;
     InstrumentsDlg_RefreshLocalFiles.visible = true;

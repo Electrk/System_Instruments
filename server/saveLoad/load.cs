@@ -1,32 +1,34 @@
-function InstrumentsServer::onPhraseLoaded(%this, %phrase, %filename, %author, %bl_id, %client, %failure) {
+function InstrumentsServer::onPhraseLoaded(%this, %phrase, %filename, %author, %bl_id, %client, %failure, %isDownloading) {
   commandToClient(%client, 'Instruments_onPhraseLoaded', %phrase, %filename, %author, %bl_id, %failure);
 }
 
-function InstrumentsServer::onSongLoaded(%this, %song, %filename, %author, %bl_id, %client, %failure) {
+function InstrumentsServer::onSongLoaded(%this, %song, %filename, %author, %bl_id, %client, %failure, %isDownloading) {
   commandToClient(%client, 'Instruments_onSongLoaded', %song, %filename, %author, %bl_id, %failure);
 }
 
-function InstrumentsServer::onSongPhraseData(%this, %index, %phrase, %client) {
+function InstrumentsServer::onSongPhraseData(%this, %index, %phrase, %client, %isDownloading) {
   if (_strEmpty(%phrase)) {
     return;
   }
 
-  %phrase = getSubStr(%phrase, 0, 255);
-  %client.songPhrase[%index] = %phrase;
+  if (!%isDownloading) {
+    %phrase = getSubStr(%phrase, 0, 255);
+    %client.songPhrase[%index] = %phrase;
+  }
   
   commandToClient(%client, 'Instruments_onSongPhraseData', %index, %phrase, %client);
 }
 
-function InstrumentsServer::onBindsetLoaded(%this, %filename, %author, %bl_id, %client, %failure) {
+function InstrumentsServer::onBindsetLoaded(%this, %filename, %author, %bl_id, %client, %failure, %isDownloading) {
   commandToClient(%client, 'Instruments_onBindsetLoaded', %filename, %author, %bl_id, %failure);
 }
 
-function InstrumentsServer::onBindsetData(%this, %key, %phraseOrNote, %client) {
+function InstrumentsServer::onBindsetData(%this, %key, %phraseOrNote, %client, %isDownloading) {
   if (_strEmpty(%key)) {
     return;
   }
 
-  if (isObject(%client.instrumentBinds)) {
+  if (!%isDownloading && isObject(%client.instrumentBinds)) {
     if (_strEmpty(%phraseOrNote)) {
       %client.instrumentBinds.removeBind(%key);
     }
@@ -38,7 +40,7 @@ function InstrumentsServer::onBindsetData(%this, %key, %phraseOrNote, %client) {
   commandToClient(%client, 'Instruments_onBindsetData', %key, %phraseOrNote);
 }
 
-function serverCmdInstruments_LoadFile(%client, %type, %filename) {
+function serverCmdInstruments_LoadFile(%client, %type, %filename, %isDownloading) {
   if (!%client.hasInstrumentsClient) {
     return;
   }
@@ -67,5 +69,5 @@ function serverCmdInstruments_LoadFile(%client, %type, %filename) {
     return;
   }
 
-  Instruments.loadFile(%type, %filename, %client);
+  Instruments.loadFile(%type, %filename, %client, %isDownloading);
 }

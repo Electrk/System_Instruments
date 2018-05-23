@@ -22,13 +22,13 @@ function InstrumentsClient::loadFile(%this, %type, %filename, %localOrServer) {
   %filename = _cleanFilename(%filename);
   %phraseOrSong = "";
 
-  $Instruments::Client::isLoading = true;
+  $Instruments::GUI::isLoading = true;
 
   if (%localOrServer $= "local") {
     Instruments.loadFile(%type, %filename);
   }
   else if (%localOrServer $= "server") {
-    commandToServer('Instruments_LoadFile', %type, %filename);
+    commandToServer('Instruments_LoadFile', %type, %filename, $Instruments::GUI::isDownloading);
   }
 }
 
@@ -38,6 +38,10 @@ function InstrumentsClient::setLoadedAuthor(%this, %type, %author, %bl_id) {
 }
 
 function InstrumentsClient::onFileLoadStart(%this, %type, %filename, %useServerCmd) {
+  if ($Instruments::GUI::isUploading || $Instruments::GUI::isDownloading || !$Instruments::GUI::isLoading) {
+    return;
+  }
+
   if (%type $= "song") {
     InstrumentsClient.clearAllSongPhrases(%useServerCmd);
   }
@@ -46,59 +50,95 @@ function InstrumentsClient::onFileLoadStart(%this, %type, %filename, %useServerC
   }
 }
 
+// These methods aren't DRY at all, but I can't be fucked to rewrite them right now
+
 function InstrumentsClient::onPhraseLoaded(%this, %phrase, %filename, %author, %bl_id, %unusedArg, %failure) {
-  if (!$Instruments::Client::isLoading) {
+  if (!$Instruments::GUI::isLoading) {
     return;
   }
 
   if (%failure $= "") {
-    %phrase = _cleanPhrase(%phrase);
-    InstrumentsClient.setPhrase(%phrase);
-
-    %body = "Successfully loaded " @ %filename @ " by " @ %author;
-
-    if (%bl_id >= 0 && %bl_id != 888888 && %bl_id != 999999) {
-       %body = %body @ " (BL_ID: " @ %bl_id @ ")";
+    if ($Instruments::GUI::isUploading) {
+      $Instruments::GUI::Upload::Phrase = %phrase;
+      
+      InstrumentsClient.saveFile("phrase", "server", %filename, %author TAB %bl_id);
+      $Instruments::GUI::isUploading = false;
+      deleteVariables("$Instruments::GUI::Upload::*");
     }
+    else if ($Instruments::GUI::isDownloading) {
+      $Instruments::GUI::Download::Phrase = %phrase;
 
-    InstrumentsClient.setLoadedAuthor("phrase", %author, %bl_id);
-    InstrumentsClient.updateSaveButtons();
-    Instruments.messageBoxOK("Phrase Loaded", %body);
+      InstrumentsClient.saveFile("phrase", "local", %filename, %author TAB %bl_id);
+      $Instruments::GUI::isDownloading = false;
+      deleteVariables("$Instruments::GUI::Download::*");
+    }
+    else {
+      %phrase = _cleanPhrase(%phrase);
+      InstrumentsClient.setPhrase(%phrase);
+
+      %body = "Successfully loaded " @ %filename @ " by " @ %author;
+
+      if (%bl_id >= 0 && %bl_id != 888888 && %bl_id != 999999) {
+         %body = %body @ " (BL_ID: " @ %bl_id @ ")";
+      }
+
+      InstrumentsClient.setLoadedAuthor("phrase", %author, %bl_id);
+      InstrumentsClient.updateSaveButtons();
+
+      Instruments.messageBoxOK("Phrase Loaded", %body);
+    }
   }
   else {
     Instruments.messageBoxOK("Error Loading File", %failure);
   }
 
-  $Instruments::Client::isLoading = false;
+  $Instruments::GUI::isLoading = false;
 }
 
 function InstrumentsClient::onSongLoaded(%this, %song, %filename, %author, %bl_id, %unusedArg, %failure) {
-  if (!$Instruments::Client::isLoading) {
+  if (!$Instruments::GUI::isLoading) {
     return;
   }
 
   if (%failure $= "") {
-    InstrumentsClient.textToSong(%song);
+    if ($Instruments::GUI::isUploading) {
+      $Instruments::GUI::Upload::Song = %song;
 
-    %body = "Successfully loaded " @ %filename @ " by " @ %author;
-
-    if (%bl_id >= 0 && %bl_id != 888888 && %bl_id != 999999) {
-       %body = %body @ " (BL_ID: " @ %bl_id @ ")";
+      InstrumentsClient.saveFile("song", "server", %filename, %author TAB %bl_id);
+      $Instruments::GUI::isUploading = false;
+      deleteVariables("$Instruments::GUI::Upload::*");
     }
-    
-    InstrumentsClient.setLoadedAuthor("song", %author, %bl_id);
-    InstrumentsClient.updateSongOrderList();
-    Instruments.messageBoxOK("Song Loaded", %body);
+    else if ($Instruments::GUI::isDownloading) {
+      $Instruments::GUI::Download::Song = %song;
+
+      InstrumentsClient.saveFile("song", "local", %filename, %author TAB %bl_id);
+      $Instruments::GUI::isDownloading = false;
+      deleteVariables("$Instruments::GUI::Download::*");
+    }
+    else {
+      InstrumentsClient.textToSong(%song);
+
+      %body = "Successfully loaded " @ %filename @ " by " @ %author;
+
+      if (%bl_id >= 0 && %bl_id != 888888 && %bl_id != 999999) {
+         %body = %body @ " (BL_ID: " @ %bl_id @ ")";
+      }
+      
+      InstrumentsClient.setLoadedAuthor("song", %author, %bl_id);
+      InstrumentsClient.updateSongOrderList();
+
+      Instruments.messageBoxOK("Song Loaded", %body);
+    }
   }
   else {
     Instruments.messageBoxOK("Error Loading File", %failure);
   }
 
-  $Instruments::Client::isLoading = false;
+  $Instruments::GUI::isLoading = false;
 }
 
 function InstrumentsClient::onSongPhraseData(%this, %index, %phrase, %useServerCmd) {
-  if (!$Instruments::Client::isLoading) {
+  if (!$Instruments::GUI::isLoading) {
     return;
   }
 
@@ -106,44 +146,80 @@ function InstrumentsClient::onSongPhraseData(%this, %index, %phrase, %useServerC
     return;
   }
 
-  if (%useServerCmd) {
-    commandToServer('setSongPhrase', %index, %phrase, 1);
+  if ($Instruments::GUI::isUploading) {
+    commandToServer('setSongPhrase', %index, %phrase, 1, 1);
   }
+  else if ($Instruments::GUI::isDownloading) {
+    $Instruments::GUI::Download::SongPhrase[%index] = %phrase;
+  }
+  else {
+    if (%useServerCmd) {
+      commandToServer('setSongPhrase', %index, %phrase, 1, 0);
+    }
 
-  %phrase = _cleanPhrase(%phrase);
-  InstrumentsClient.setSongPhrase(%index, %phrase);
+    %phrase = _cleanPhrase(%phrase);
+    InstrumentsClient.setSongPhrase(%index, %phrase);
+  }
 }
 
 function InstrumentsClient::onBindsetLoaded(%this, %filename, %author, %bl_id, %unusedArg, %failure) {
-  if (!$Instruments::Client::isLoading) {
+  if (!$Instruments::GUI::isLoading) {
     return;
   }
 
   if (%failure $= "") {
-    %body = "Successfully loaded " @ %filename @ " by " @ %author;
-
-    if (%bl_id >= 0 && %bl_id != 888888 && %bl_id != 999999) {
-       %body = %body @ " (BL_ID: " @ %bl_id @ ")";
+    if ($Instruments::GUI::isUploading) {
+      InstrumentsClient.saveFile("bindset", "server", %filename, %author TAB %bl_id);
+      $Instruments::GUI::isUploading = false;
+      deleteVariables("$Instruments::GUI::Upload::*");
     }
+    else if ($Instruments::GUI::isDownloading) {
+      InstrumentsClient.saveFile("bindset", "local", %filename, %author TAB %bl_id);
+      $Instruments::GUI::isDownloading = false;
+      deleteVariables("$Instruments::GUI::Download::*");
+    }
+    else {
+      %body = "Successfully loaded " @ %filename @ " by " @ %author;
 
-    InstrumentsClient.setLoadedAuthor("bindset", %author, %bl_id);
-    InstrumentsClient.updateSaveButtons();
-    Instruments.messageBoxOK("Bindset Loaded", %body);
+      if (%bl_id >= 0 && %bl_id != 888888 && %bl_id != 999999) {
+         %body = %body @ " (BL_ID: " @ %bl_id @ ")";
+      }
+
+      InstrumentsClient.setLoadedAuthor("bindset", %author, %bl_id);
+      InstrumentsClient.updateSaveButtons();
+
+      Instruments.messageBoxOK("Bindset Loaded", %body);
+    }
   }
   else {
     Instruments.messageBoxOK("Error Loading File", %failure);
   }
 
-  $Instruments::Client::isLoading = false;
+  $Instruments::GUI::isLoading = false;
 }
 
 function InstrumentsClient::onBindsetData(%this, %key, %phraseOrNote, %useServerCmd) {
-  if (!$Instruments::Client::isLoading) {
+  if (!$Instruments::GUI::isLoading) {
     return;
   }
 
-  %control = InstrumentsMap.keyControl[%key];
-  InstrumentsClient.bindToKey(%phraseOrNote, %key, 0, %useServerCmd);
+  if ($Instruments::GUI::isUploading) {
+    commandToServer('Instruments_BindToKey', %key, %phraseOrNote, 1);
+  }
+  else if ($Instruments::GUI::isDownloading) {
+    %index = $Instruments::GUI::Download::NumBinds;
+
+    if (%index $= "") {
+      %index = 0;
+    }
+
+    $Instruments::GUI::Download::Bind[%index] = %key TAB %phraseOrNote;
+    $Instruments::GUI::Download::NumBinds++;
+  }
+  else {
+    %control = InstrumentsMap.keyControl[%key];
+    InstrumentsClient.bindToKey(%phraseOrNote, %key, 0, %useServerCmd);
+  }
 }
 
 function clientCmdInstruments_onFileLoadStart(%type, %filename) {
